@@ -210,8 +210,13 @@ void algor::greedyRouting(Channel *channel){
 			reached[id].push_back(col);
 		}
 		for(auto [id, s] : reached){
-			if(s.size() != 1 || channel->lastPin[id] >= i) continue;
-			curTrack.erase(*s.begin());
+			if(s.size() != 1 || channel->lastPin[id] > i) continue;
+			if(s.size() == 1 || channel->lastPin[id] == i){
+                curTrack.erase(*s.begin());
+                continue;
+            }
+            curTrack.erase(*s.begin());
+            
 		}
         
         //

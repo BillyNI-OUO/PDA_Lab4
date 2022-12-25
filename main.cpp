@@ -9,5 +9,5 @@ int main(int argc, char** argv){
     channel->init();
     algor::greedyRouting(channel);
     io::writeNets(channel, argv[2]);
-    io::drawNets(argv[1], "output2.txt", argv[3]);
+    io::drawNets(argv[1], argv[2], argv[3]);
 }
