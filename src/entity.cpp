@@ -18,8 +18,8 @@ void Channel::init(){
     this->netLists.resize(this->maxNetIndex+1);
     for(int i = 0; i < this->channelLength; i ++){
         lastPin[topPin[i]] = i;
-        isTop[topPin[i]] = true;
+        isTop[topPin[i]]++;
         lastPin[botPin[i]] = i;
-        isTop[botPin[i]] = false;
+        isTop[botPin[i]]--;
     }
 }

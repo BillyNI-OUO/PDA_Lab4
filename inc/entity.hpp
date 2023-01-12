@@ -14,7 +14,7 @@ class Channel{
         std::vector<int> topPin;
         std::vector<int> botPin;
         std::vector<int> lastPin;
-        std::vector<bool> isTop;
+        std::vector<int> isTop;
         int maxNetIndex;
         int channelLength;
         std::vector<std::vector<vias>> netLists;

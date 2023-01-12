@@ -8,13 +8,16 @@
 #include <utility>
 #include <iostream>
 int findTrackFromNet(std::map<int, int> curTrack, int netID, bool isTop);
-void insertVertical(int netID, int startX, int startY, int segment, std::vector<std::vector<vias>> &vertical);
+void insertVertical(int netID, int startX, int startY, int segment, std::vector<std::vector<vias>> &vertical, std::vector<bool> &verticalMap);
 int findEmptyTrack(std::map<int, int> curTrack, bool isTop, int tracksHeight);
+int findTop(int netID, int col, Channel channel, std::map<int, int> curTrack, int nowTrack);
 void algor::greedyRouting(Channel *channel){
     int tracksHeight = 30;
-    
+    if(channel->maxNetIndex > 30)tracksHeight = 40;
+    std::vector<bool>checkStart(channel->maxNetIndex+1, false);
     std::vector<std::vector<vias>> vertical;
     std::vector<std::vector<vias>> horizonal;
+    
     vertical.resize(channel->maxNetIndex+1);
     horizonal.resize(channel->maxNetIndex+1);
 
@@ -24,7 +27,10 @@ void algor::greedyRouting(Channel *channel){
     
     for(int i = 0; i < channel->channelLength+10; i ++){
         if(i!=0 && !curTrack.size())break;
+        std::vector<bool> verticalMap(tracksHeight+1, false);
+        std::vector<bool> reachedTrackMap(channel->maxNetIndex+1, false);
         for(auto j: curTrack){
+            reachedTrackMap[j.first] = true;
             vias newVias;
             newVias.X = i-1;
             newVias.Y = j.first;
@@ -37,7 +43,7 @@ void algor::greedyRouting(Channel *channel){
         int upperBound = tracksHeight+1; 
         int lowerBound = 0;
         if(topNetID == botNetID && channel->lastPin[topNetID] == i){ //case E
-            if(topNetID != 0) insertVertical(topNetID, i, 0, tracksHeight+1, vertical);
+            if(topNetID != 0) insertVertical(topNetID, i, 0, tracksHeight+1, vertical, verticalMap);
             topNetID = 0, botNetID = 0;
             upperBound = 0;
 		}else{
@@ -50,15 +56,13 @@ void algor::greedyRouting(Channel *channel){
             int placeBotTrack = std::min(emptyBotTrack, botTrack);
             if (placeBotTrack == -1)
                 placeBotTrack = std::max(emptyBotTrack, botTrack);
-
-            std::cout<< "!!!!" << i << std::endl;
-            std::cout<< topTrack  << " "<< emptyTopTrack << std::endl;          
+        
             if(placeBotTrack < placeTopTrack){
                 if(topNetID != 0){
                     if(placeTopTrack == -1){
                         //do e
                     }else{
-                        insertVertical(topNetID, i, placeTopTrack, tracksHeight-placeTopTrack+1, vertical);
+                        insertVertical(topNetID, i, placeTopTrack, tracksHeight-placeTopTrack+1, vertical, verticalMap);
                         curTrack.insert(std::pair<int, int>(placeTopTrack, topNetID));
                         upperBound = placeTopTrack;
                     }
@@ -67,7 +71,7 @@ void algor::greedyRouting(Channel *channel){
                     if(placeBotTrack == -1){
                         //do e
                     }else{
-                        insertVertical(botNetID, i, 0, placeBotTrack, vertical);
+                        insertVertical(botNetID, i, 0, placeBotTrack, vertical, verticalMap);
                         curTrack.insert(std::pair<int, int>(placeBotTrack, botNetID));
                         lowerBound = placeBotTrack;
                         
@@ -79,7 +83,7 @@ void algor::greedyRouting(Channel *channel){
                     //do e
                 }else{
                     placeTopTrack += 1;
-                    insertVertical(topNetID, i, placeTopTrack, tracksHeight-placeTopTrack+1, vertical);
+                    insertVertical(topNetID, i, placeTopTrack, tracksHeight-placeTopTrack+1, vertical, verticalMap);
                     curTrack.insert(std::pair<int, int>(placeTopTrack, topNetID));
                     upperBound = placeTopTrack;
                 }
@@ -87,16 +91,18 @@ void algor::greedyRouting(Channel *channel){
                 
                 
                 if(tracksHeight-placeTopTrack+1 < placeBotTrack){
-                    insertVertical(topNetID, i, placeTopTrack, tracksHeight-placeTopTrack+1, vertical);
+                    insertVertical(topNetID, i, placeTopTrack, tracksHeight-placeTopTrack+1, vertical, verticalMap);
                     curTrack.insert(std::pair<int, int>(placeTopTrack, topNetID));
                     upperBound = placeTopTrack;
                 }else{
-                    insertVertical(botNetID, i, 0, placeBotTrack, vertical);
+                    insertVertical(botNetID, i, 0, placeBotTrack, vertical, verticalMap);
                     curTrack.insert(std::pair<int, int>(placeBotTrack, botNetID));
                     lowerBound = placeBotTrack;
                 }
             }
-
+            // channel->isTop[topNetID]--;
+            // channel->isTop[botNetID]++;
+            
 
 
             
@@ -168,13 +174,17 @@ void algor::greedyRouting(Channel *channel){
 	    		highest[t.second] = t.first;
 			}
         }
-        std::sort(points.begin(), points.end());
+        std::sort(points.begin(), points.end(), [](std::tuple<int, int, int> a, std::tuple<int, int, int> b){
+            if(std::get<1>(a) != std::get<1>(b) )
+                return std::get<1>(a) < std::get<1>(b);
+            else std::get<0>(a) < std::get<0>(b);
+        });
 		std::vector<int> selected;  
         if(points.size()){
             int index;
             for(index = 0; index < points.size(); index ++ ){
                 auto [r1, r2, id] = points[index];
-                if(r1 > lowerBound && r2 < upperBound){
+                if(r1 >= lowerBound && r2 <= upperBound){
                     selected.push_back(index);
                     break;
                 }
@@ -182,7 +192,7 @@ void algor::greedyRouting(Channel *channel){
             //selected.push_back(0);
             for(int k=index+1; k<points.size(); k++){
                 auto [r1, r2, id] = points[k];
-                if(std::get<1>(points[selected.back()]) <= r1 && r2 < upperBound){
+                if(std::get<1>(points[selected.back()]) <= r1 && r2 <= upperBound){
                     selected.push_back(k);
                 }else if(std::get<1>(points[selected.back()]) > r2){
                     selected.pop_back();
@@ -192,13 +202,18 @@ void algor::greedyRouting(Channel *channel){
 
             for(int j=0; j<selected.size(); j++){	
                 auto [r1, r2, id] = points[selected[j]];
-                insertVertical(id, i, r1, r2-r1, vertical);
+                insertVertical(id, i, r1, r2-r1, vertical, verticalMap);
             }
             tracks.push_back(curTrack);
 			//next col's track
-			for(int i=0; i<selected.size(); i++){
+			for(int ii=0; ii<selected.size(); ii++){
                 //do better
-				curTrack.erase(std::get<0>(points[selected[i]]));
+                
+                if(findTop(std::get<2>(points[selected[ii]]), i, *channel, curTrack, -1) > 0){
+				    curTrack.erase(std::get<0>(points[selected[ii]]));
+                }else{
+                   curTrack.erase(std::get<1>(points[selected[ii]])); 
+                }
 			}
         }else{
             tracks.push_back(curTrack);
@@ -211,19 +226,69 @@ void algor::greedyRouting(Channel *channel){
 		}
 		for(auto [id, s] : reached){
 			if(s.size() != 1 || channel->lastPin[id] > i) continue;
-			if(s.size() == 1 || channel->lastPin[id] == i){
-                curTrack.erase(*s.begin());
-                continue;
-            }
             curTrack.erase(*s.begin());
             
 		}
-        
+
+    
+        std::vector<int> eraseList;
+        for(int time = 0; time < 5; time ++){
+            for(auto [col, id] : curTrack){
+                int start=1;
+                int len = start;
+                int direction = findTop(id, i, *channel, curTrack, col);
+                // if(checkStart[id]){
+                //     continue;
+                // }
+                for(;start<tracksHeight/5;start ++){
+                    if(direction > 0){
+                        if(start+col >= tracksHeight){
+                            break;
+                        }
+                        if(verticalMap[col+start]){               
+                            break;
+                        }
+                        if(curTrack.find(col+start) != curTrack.end() || reachedTrackMap[col+start]){
+                            continue;
+                        }
+                        len = start;
+                    }else if(direction < 0){
+                        if(col-start <= 0){
+                            break;
+                        }
+                        if(verticalMap[col-start]){
+                            break;
+                        }
+                        if(curTrack.find(col-start) != curTrack.end() || reachedTrackMap[col-start]){
+                            continue;
+                        }
+                        len = start;
+                    }
+                }
+                if(len <= 2){
+                    continue;
+                }else{
+                    if(direction > 0){
+                        eraseList.push_back(col);
+                        curTrack.insert(std::pair<int, int>(col+len, id));
+                        insertVertical(id, i, col, len, vertical, verticalMap);
+                    }else if(direction < 0){
+                        eraseList.push_back(col);
+                        curTrack.insert(std::pair<int, int>(col-len, id));
+                        insertVertical(id, i, col-len, len, vertical, verticalMap);
+                    }
+                }
+            }
+            for(auto erase:eraseList){
+                curTrack.erase(erase);
+            }
+        }
         //
 
         //insert horizonal
         
-
+        checkStart[topNetID] = true;
+        checkStart[botNetID] = true;
     }
     tracks.push_back(std::map<int, int>());
 
@@ -310,11 +375,36 @@ int findEmptyTrack(std::map<int, int> curTrack, bool isTop, int tracksHeight){
     return -1;
 }
 
-void insertVertical(int netID, int startX, int startY, int segment, std::vector<std::vector<vias>> &vertical){
+void insertVertical(int netID, int startX, int startY, int segment, std::vector<std::vector<vias>> &vertical, std::vector<bool>&verticalMap ){
     vias newVias;
     newVias.X = startX;
     newVias.Y = startY;
     newVias.segment = segment;
     vertical[netID].push_back(newVias);
+    for(int i = 0; i <= segment; i ++){
+        verticalMap[startY+i] = true;
+    }
+}
+
+int findTop(int netID, int col, Channel channel, std::map<int, int> curTrack, int nowTrack){
+    if(nowTrack != -1){
+        for(auto [track, id] :curTrack){
+            if(id == netID && track != nowTrack){
+                if(track > nowTrack){
+                    return 1;
+                }else{
+                    return -1;
+                }
+            }
+        }
+    }
+    if(col < channel.lastPin[netID]){
+        for(int i = col+1; i < channel.topPin.size(); i ++){
+            if(channel.topPin.at(i) == netID)return 1;
+            if(channel.botPin.at(i) == netID)return -1;
+            if(i-col > 10)return 0;
+        }
+    }
+    return 0;
 }
 
